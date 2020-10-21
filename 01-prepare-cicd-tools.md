@@ -41,7 +41,7 @@ echo "export GUID=57bc" >> ~/.bashrc
 
 ## Set up Gogs 
 
-[Gogs](https://gogs.io/) is a self-hosted Git service. Use this step if no access to the final git repository is available.
+[Gogs](https://gogs.io/) is a self-hosted Git service. Use this step if you don't want to use any already existing git hosting (e.g. Github).
 
 ### Set Up Project and Database and Install Gogs
 
@@ -101,6 +101,8 @@ Use the value for `$GOGSROUTE`. Navigate to `$GOGSROUTE`. Set up Gogs with these
 
 ### Make Gogs Pod Resilient to Restarts
 
+The Gogs installation wizard writes the configuration into a `/opt/gogs/custom/conf/app.ini` file in the container. When the pod is restarted, the pod is recreated from the container image and any files written to the container from previous invocations are no longer present. Therefore you must make this file permanent. The easiest way to do this is to extract the file from the container and create a ConfigMap holding that file. This ConfigMap can then be mounted in the correct location, which makes this configuration permanent and resilient to pod restarts.
+
 Examine the generated `app.ini` file:
 
 
@@ -125,3 +127,112 @@ rm -f app.ini
 ```
 
 Wait until the redeployment finishes.
+
+
+## Set up Nexus
+
+### Deploy Nexus
+
+Create a new project
+
+```
+oc new-project ${GUID}-nexus --display-name "Shared Nexus"
+```
+
+Deploy the Nexus container image and create a route to the Nexus service.
+
+```
+oc new-app sonatype/nexus3:3.25.1 --name=nexus
+oc expose svc nexus
+oc rollout pause dc nexus
+```
+
+Change the deployment strategy and set requests and limits for memory.
+
+```
+oc patch dc nexus --patch='{ "spec": { "strategy": { "type": "Recreate" }}}'
+oc set resources dc nexus --limits=memory=2Gi,cpu=2 --requests=memory=1Gi,cpu=500m
+```
+
+Create a persistent volume claim (PVC) and mount it at /nexus-data.
+
+```
+oc set volume dc/nexus --add --overwrite --name=nexus-volume-1 --mount-path=/nexus-data/ --type persistentVolumeClaim --claim-name=nexus-pvc --claim-size=10Gi
+```
+
+Set up liveness and readiness probes for Nexus.
+
+```
+oc set probe dc/nexus --liveness --failure-threshold 3 --initial-delay-seconds 60 -- echo ok
+oc set probe dc/nexus --readiness --failure-threshold 3 --initial-delay-seconds 60 --get-url=http://:8081/
+```
+
+Finally, resume deployment of the Nexus deployment configuration to roll out all changes at once.
+
+```
+oc rollout resume dc nexus
+```
+
+### Coonfigure Nexus
+
+Once Nexus is deployed, set up your Nexus repository using the provided script. Use the Nexus default user ID (**admin**). The default password for **admin** user is stored in the Nexus pod in the `/nexus-data/admin.password` file. Use the oc rsh command to get into the Nexus pod and retrieve the password.
+
+```
+export NEXUS_PASSWORD=$(oc rsh $(oc get pod | grep "^nexus" | grep Running | awk '{print $1}') cat /nexus-data/admin.password)
+echo $NEXUS_PASSWORD
+```
+
+
+Due to changes in version `3.21.2` which disabled Groovy scripting by default, you must enable the ability to use a script to allow creation of proxies, repositories, etc. in Nexus. You can enable this by manually adding `nexus.scripts.allowCreation=true` to the `/nexus-data/etc/nexus.properties` file in the Nexus Pod. However, doing this manually should not be a method you follow. With a **DeploymentConfig**, you can use a **deployment-hook** to do this for you.
+
+```
+oc set deployment-hook dc/nexus --mid --volumes=nexus-volume-1 \
+-- /bin/sh -c "echo nexus.scripts.allowCreation=true >./nexus-data/etc/nexus.properties"
+
+oc rollout latest dc/nexus
+
+watch oc get po
+```
+
+With the script option enabled and your Nexus Pod **Ready** and **Running**, you can now proceed with executing the setup script.
+
+```
+cd $HOME
+
+curl -o setup_nexus3.sh -s https://raw.githubusercontent.com/redhat-gpte-devopsautomation/ocp_advanced_development_resources/master/nexus/setup_nexus3.sh
+
+chmod +x setup_nexus3.sh
+
+./setup_nexus3.sh admin $NEXUS_PASSWORD http://$(oc get route nexus --template='{{ .spec.host }}')
+
+rm setup_nexus3.sh
+```
+
+This script creates:
+- A few Maven proxy repositories to cache Red Hat and JBoss dependencies.
+- A **maven-all-public** group repository that contains the proxy repositories for all of the required artifacts.
+- An NPM proxy repository to cache Node.JS build artifacts.
+- A private Docker registry.
+- A **releases** repository for the WAR files that are produced by your pipeline.
+- A Docker registry in Nexus listening on port 5000. OpenShift does not know about this additional endpoint, so you need to create an additional route that exposes the Nexus Docker registry for your use.
+
+  ```
+  oc expose dc nexus --port=5000 --name=nexus-registry
+  oc create route edge nexus-registry --service=nexus-registry --port=5000
+  ```
+
+
+### Set up Nexus
+
+Confirm your routes
+
+```
+oc get routes
+```
+
+- Using the **nexus** route, **admin** as the user id and the Nexus Password you retrieved earlier (using `$NEXUS_PASSWORD` variable) log into Nexus in a web browser. 
+- You will see the "Welcome" wizard that prompts you to select a new password for admin.
+- Use `app_deploy` as the new password.
+- When prompted to Configure Anonymous Access select the Checkbox to allow anonymous access and click Next.
+- Click Finish to exit the wizard.
+- You may double check that all the repositories (docker, maven-all-public, redhat-ga) are listed under repositories
