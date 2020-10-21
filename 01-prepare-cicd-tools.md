@@ -236,3 +236,65 @@ oc get routes
 - When prompted to Configure Anonymous Access select the Checkbox to allow anonymous access and click Next.
 - Click Finish to exit the wizard.
 - You may double check that all the repositories (docker, maven-all-public, redhat-ga) are listed under repositories
+
+## Set up SonarQube
+
+Create a new project 
+
+```
+oc new-project ${GUID}-sonarqube --display-name "Shared Sonarqube"
+```
+
+Deploy a persistent PostgreSQL database.
+
+```
+oc new-app --template=postgresql-persistent --param POSTGRESQL_USER=sonar --param POSTGRESQL_PASSWORD=sonar --param POSTGRESQL_DATABASE=sonar --param VOLUME_CAPACITY=4Gi --labels=app=sonarqube_db
+```
+
+Make sure that your database is fully up before moving to the next step.
+
+Deploy the SonarQube
+
+```
+oc new-app --docker-image=quay.io/gpte-devops-automation/sonarqube:7.9.1 --env=SONARQUBE_JDBC_USERNAME=sonar --env=SONARQUBE_JDBC_PASSWORD=sonar --env=SONARQUBE_JDBC_URL=jdbc:postgresql://postgresql/sonar --labels=app=sonarqube
+oc rollout pause dc sonarqube
+oc expose service sonarqube
+```
+
+Create a PVC (at least 5Gi in size) and mount it at `/opt/sonarqube/data`.
+
+```
+oc set volume dc/sonarqube --add --overwrite --name=sonarqube-volume-1 --mount-path=/opt/sonarqube/data/ --type persistentVolumeClaim --claim-name=sonarqube-pvc --claim-size=5Gi
+```
+
+Set the deployment strategy and resources. SonarQube is a heavy application. The following parameters are suggested:
+* Memory request: 2Gi
+* Memory limit: 3Gi
+* CPU request: 1 CPU
+* CPU limit: 2 CPUs
+
+```
+oc set resources dc/sonarqube --limits=memory=3Gi,cpu=2 --requests=memory=2Gi,cpu=1
+oc patch dc sonarqube --patch='{ "spec": { "strategy": { "type": "Recreate" }}}'
+```
+
+Add liveness and readiness probes
+
+```
+oc set probe dc/sonarqube --liveness --failure-threshold 3 --initial-delay-seconds 40 --get-url=http://:9000/about
+oc set probe dc/sonarqube --readiness --failure-threshold 3 --initial-delay-seconds 20 --get-url=http://:9000/about
+```
+
+Because SonarQube uses Elasticsearch and Elasticsearch has some rather heavy requirements add the label `tuned.openshift.io/elasticsearch: "true"` to the SonarQube Pods. This ensures that the OpenShift 4 Tuned operator configures the node that the Sonarqube pod lands on correctly. 
+
+```
+oc patch dc/sonarqube --type=merge -p '{"spec": {"template": {"metadata": {"labels": {"tuned.openshift.io/elasticsearch": "true"}}}}}'
+```
+
+ Resume deployment 
+ 
+ ```
+ oc rollout resume dc sonarqube
+ ```
+ 
+Once SonarQube has fully started, open your web browser and log in via the exposed route. The default user ID is **admin** and password is **admin**.
