@@ -128,6 +128,12 @@ rm -f app.ini
 
 Wait until the redeployment finishes.
 
+### Register a new user
+
+* Open your Gogs Server in a web browser.
+* Register a new user account for yourself.
+* Log in to your Gogs server with your new user account.
+
 
 ## Set up Nexus
 
