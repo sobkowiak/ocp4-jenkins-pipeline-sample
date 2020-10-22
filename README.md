@@ -3,6 +3,7 @@
 This repository contains material about preparing a simple Jenkins pipeline on OpenShift 4.
 
 * [Prepare CI/CD environment](01-prepare-cicd-tools.md)
+* [Test the CI/CD environment](02-test-cicd-tools.md)
 
 ## Copyright and Licensing
 
