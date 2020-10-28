@@ -4,6 +4,7 @@ This repository contains material about preparing a simple Jenkins pipeline on O
 
 * [Prepare CI/CD environment](01-prepare-cicd-tools.md)
 * [Test the CI/CD environment](02-test-cicd-tools.md)
+* [Set up Jenkins](03-setup-jenkins.md)
 
 ## Copyright and Licensing
 
