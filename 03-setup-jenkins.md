@@ -37,7 +37,7 @@ Check the **maven** pod template with preinstalled Java and Maven, which is used
 - Select Manage Nodes and **Clouds → Configure Clouds**
 - Select **Pod Templates**, next **maven** → **Pod Template details...**
 - Check that following values are set
-  - Name: **`maven-appdev`**
+  - Name: **`maven`**
   - Namespace: **`<empty>`**
   - Labels: **`maven`**
   - Usage: **Only build jobs with label expressions matching this node**
@@ -86,7 +86,7 @@ Using a simple pipeline, you can now test that the agent pod is working properly
     + java -version
     openjdk version "11.0.8" 2020-07-14 LTS
     ```
-    The **openshift-tasks** application requires **JDK 8**. To change the version go to the **maven** agent pod definition, next **EnvVars: → Add Environment Variable**
+  - The **openshift-tasks** application requires **JDK 8**. To change the version go to the **maven** agent pod definition, next **EnvVars: → Add Environment Variable**
     - Key: **`USE_JAVA_VERSION`**
     - Value: **`java-1.8.0`**
 
