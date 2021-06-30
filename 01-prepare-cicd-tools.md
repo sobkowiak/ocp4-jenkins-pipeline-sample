@@ -54,7 +54,7 @@ oc new-app postgresql-persistent --param POSTGRESQL_DATABASE=gogs --param POSTGR
 Wait until the database pod is running. Set up Gogs pod:
 
 ```
-oc new-app wkulhanek/gogs:11.86 -lapp=gogs
+oc new-app wkulhanek/gogs:11.86 -lapp=gogs --as-deployment-config
 oc rollout pause dc gogs
 ```
 
@@ -148,7 +148,7 @@ oc new-project ${GUID}-nexus --display-name "Shared Nexus"
 Deploy the Nexus container image and create a route to the Nexus service.
 
 ```
-oc new-app sonatype/nexus3:3.25.1 --name=nexus
+oc new-app sonatype/nexus3:3.25.1 --name=nexus --as-deployment-config
 oc expose svc nexus
 oc rollout pause dc nexus
 ```
@@ -262,7 +262,7 @@ Make sure that your database is fully up before moving to the next step.
 Deploy the SonarQube
 
 ```
-oc new-app --docker-image=quay.io/gpte-devops-automation/sonarqube:7.9.1 --env=SONARQUBE_JDBC_USERNAME=sonar --env=SONARQUBE_JDBC_PASSWORD=sonar --env=SONARQUBE_JDBC_URL=jdbc:postgresql://postgresql/sonar --labels=app=sonarqube
+oc new-app --docker-image=quay.io/gpte-devops-automation/sonarqube:7.9.1 --env=SONARQUBE_JDBC_USERNAME=sonar --env=SONARQUBE_JDBC_PASSWORD=sonar --env=SONARQUBE_JDBC_URL=jdbc:postgresql://postgresql/sonar --labels=app=sonarqube --as-deployment-config
 oc rollout pause dc sonarqube
 oc expose service sonarqube
 ```
