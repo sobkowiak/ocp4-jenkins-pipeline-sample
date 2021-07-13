@@ -35,13 +35,18 @@ To create a custom Jenkins agent pod we will use the OpenShift build process wit
 - Create a `Dockerfile` with following content (you can find the file under `jenkins/agents/jenkins-agent-appdev` directory)
 
     ```
-    FROM image-registry.openshift-image-registry.svc:5000/openshift/jenkins-agent-maven:v4.0
+    FROM registry.access.redhat.com/ubi8/go-toolset:latest as builder
+
+    ENV SKOPEO_VERSION=v1.0.0
+    RUN git clone -b $SKOPEO_VERSION https://github.com/containers/skopeo.git && cd skopeo/ && make binary-local DISABLE_CGO=1
+
+    FROM image-registry.openshift-image-registry.svc:5000/openshift/jenkins-agent-maven:v4.0 as final   
+
     USER root
 
-    RUN curl https://copr.fedorainfracloud.org/coprs/alsadi/dumb-init/repo/epel-7/alsadi-dumb-init-epel-7.repo -o /etc/yum.repos.d/alsadi-dumb-init-epel-7.repo && \
-    curl https://raw.githubusercontent.com/cloudrouter/centos-repo/master/CentOS-Base.repo -o /etc/yum.repos.d/CentOS-Base.repo && \
-    curl http://mirror.centos.org/centos-7/7/os/x86_64/RPM-GPG-KEY-CentOS-7 -o /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7 && \
-    yum  -y --setopt=tsflags=nodocs install skopeo && yum clean all
+    RUN mkdir /etc/containers
+    COPY --from=builder /opt/app-root/src/skopeo/default-policy.json /etc/containers/policy.json
+    COPY --from=builder /opt/app-root/src/skopeo/skopeo /usr/bin
 
     USER 1001
     ```
