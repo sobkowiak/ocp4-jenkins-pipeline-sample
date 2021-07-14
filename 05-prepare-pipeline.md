@@ -24,7 +24,7 @@ oc policy add-role-to-user edit system:serviceaccount:${GUID}-jenkins:jenkins -n
 oc new-build --binary=true --name="tasks" jboss-eap72-openshift:1.0 -n ${GUID}-tasks-dev
 oc patch bc/tasks -n ${GUID}-tasks-dev -p '{"spec":{"resources":{"limits":{"cpu": "2", "memory": "2Gi"}, "requests":{"cpu": "1", "memory": "1Gi"}}}}'
 
-oc new-app ${GUID}-tasks-dev/tasks:0.0-0 --name=tasks --allow-missing-imagestream-tags=true -n ${GUID}-tasks-dev
+oc new-app ${GUID}-tasks-dev/tasks:0.0-0 --name=tasks --allow-missing-imagestream-tags=true --as-deployment-config -n ${GUID}-tasks-dev
 oc set triggers dc/tasks --remove-all -n ${GUID}-tasks-dev
 oc expose dc tasks --port 8080 -n ${GUID}-tasks-dev
 oc expose svc tasks -n ${GUID}-tasks-dev
@@ -65,7 +65,7 @@ oc policy add-role-to-group system:image-puller system:serviceaccounts:${GUID}-t
 oc policy add-role-to-user edit system:serviceaccount:${GUID}-jenkins:jenkins -n ${GUID}-tasks-prod
 
 # Create Blue Application
-oc new-app ${GUID}-tasks-dev/tasks:0.0 --name=tasks-blue --allow-missing-imagestream-tags=true -n ${GUID}-tasks-prod
+oc new-app ${GUID}-tasks-dev/tasks:0.0 --name=tasks-blue --allow-missing-imagestream-tags=true --as-deployment-config -n ${GUID}-tasks-prod
 oc set triggers dc/tasks-blue --remove-all -n ${GUID}-tasks-prod
 oc expose dc tasks-blue --port 8080 -n ${GUID}-tasks-prod
 oc set probe dc tasks-blue -n ${GUID}-tasks-prod --readiness --failure-threshold 3 --initial-delay-seconds 60 --get-url=http://:8080/
@@ -74,7 +74,7 @@ oc set volume dc/tasks-blue --add --name=jboss-config --mount-path=/opt/eap/stan
 oc set volume dc/tasks-blue --add --name=jboss-config1 --mount-path=/opt/eap/standalone/configuration/application-roles.properties --sub-path=application-roles.properties --configmap-name=tasks-blue-config -n ${GUID}-tasks-prod
 
 # Create Green Application
-oc new-app ${GUID}-tasks-dev/tasks:0.0 --name=tasks-green --allow-missing-imagestream-tags=true -n ${GUID}-tasks-prod
+oc new-app ${GUID}-tasks-dev/tasks:0.0 --name=tasks-green --allow-missing-imagestream-tags=true --as-deployment-config -n ${GUID}-tasks-prod
 oc set triggers dc/tasks-green --remove-all -n ${GUID}-tasks-prod
 oc expose dc tasks-green --port 8080 -n ${GUID}-tasks-prod
 oc set probe dc tasks-green -n ${GUID}-tasks-prod --readiness --failure-threshold 3 --initial-delay-seconds 60 --get-url=http://:8080/
