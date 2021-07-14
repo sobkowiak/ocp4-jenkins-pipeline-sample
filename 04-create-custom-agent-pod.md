@@ -262,5 +262,5 @@ Using a simple pipeline, you can once again test that your agent pod is working 
 
     ```
     + skopeo --version
-    skopeo version 0.1.40
+    skopeo version 1.0.0
     ```
